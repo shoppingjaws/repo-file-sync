@@ -1,0 +1,39 @@
+{
+  "name": "repo-file-sync",
+  "version": "1.0.0",
+  "description": "A repository file synchronization tool",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "test": "bun test",
+    "type-check": "bun --bun tsc --noEmit",
+    "lint": "bun run biome check .",
+    "lint:fix": "bun run biome check --apply .",
+    "format": "bun run biome format --write ."
+  },
+  "keywords": [
+    "file-sync",
+    "repository",
+    "synchronization",
+    "bun"
+  ],
+  "author": "shoppingjaws",
+  "license": "MIT",
+  "devDependencies": {
+    "@biomejs/biome": "^1.8.3",
+    "@types/node": "^20.14.10",
+    "typescript": "^5.5.3"
+  },
+  "dependencies": {
+    "chokidar": "^3.6.0"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "trustedDependencies": [
+    "@biomejs/biome"
+  ]
+}
