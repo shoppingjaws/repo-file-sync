@@ -3,3 +3,7 @@ sources:
     ref: main
     files:
     - README.md
+  - repo: shoppingjaws/radio-station
+    ref: main
+    files:
+    - .gitignore
