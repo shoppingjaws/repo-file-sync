@@ -22,10 +22,14 @@ export class RepoFileSync {
   private async syncSource(source: RepoSource): Promise<void> {
     console.log(`\nSyncing from ${source.repo} (ref: ${source.ref})`);
     
+    if (source.vars && source.vars.length > 0) {
+      console.log(`  Template variables: ${source.vars.map(v => `${v.key} → ${v.value}`).join(', ')}`);
+    }
+    
     for (const file of source.files) {
       try {
         console.log(`  Downloading ${file}...`);
-        await this.fetcher.downloadFile(source.repo, source.ref, file);
+        await this.fetcher.downloadFile(source.repo, source.ref, file, undefined, source.vars);
       } catch (error) {
         console.error(`  Failed to download ${file}: ${error}`);
         throw error;
