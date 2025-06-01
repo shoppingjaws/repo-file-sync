@@ -1,0 +1,5 @@
+sources:
+  - repo: shoppingjaws/kzdiff
+    ref: main
+    files:
+    - README.md
