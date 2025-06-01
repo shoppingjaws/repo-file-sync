@@ -38,6 +38,27 @@ export class ConfigParser {
           throw new Error('Invalid config: all files must be strings');
         }
       }
+      
+      // Validate vars if present
+      if (source.vars !== undefined) {
+        if (!Array.isArray(source.vars)) {
+          throw new Error('Invalid config: vars must be an array');
+        }
+        
+        for (const varItem of source.vars) {
+          if (!varItem || typeof varItem !== 'object') {
+            throw new Error('Invalid config: each var must be an object');
+          }
+          
+          if (!varItem.key || typeof varItem.key !== 'string') {
+            throw new Error('Invalid config: each var must have a key string');
+          }
+          
+          if (!varItem.value || typeof varItem.value !== 'string') {
+            throw new Error('Invalid config: each var must have a value string');
+          }
+        }
+      }
     }
   }
 }

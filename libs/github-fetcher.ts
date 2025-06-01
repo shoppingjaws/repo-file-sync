@@ -1,5 +1,6 @@
 import { promises as fs } from 'fs';
 import { dirname, join } from 'path';
+import type { TemplateVar } from '../types.js';
 
 export class GitHubFetcher {
   async fetchFile(repo: string, ref: string, filePath: string): Promise<string> {
@@ -32,8 +33,26 @@ export class GitHubFetcher {
     }
   }
 
-  async downloadFile(repo: string, ref: string, filePath: string, localPath?: string): Promise<void> {
-    const content = await this.fetchFile(repo, ref, filePath);
+  private replaceVariables(content: string, vars?: TemplateVar[]): string {
+    if (!vars || vars.length === 0) {
+      return content;
+    }
+    
+    let result = content;
+    for (const variable of vars) {
+      // Replace all occurrences of the key with the value
+      result = result.replaceAll(variable.key, variable.value);
+    }
+    
+    return result;
+  }
+
+  async downloadFile(repo: string, ref: string, filePath: string, localPath?: string, vars?: TemplateVar[]): Promise<void> {
+    let content = await this.fetchFile(repo, ref, filePath);
+    
+    // Apply variable replacements if provided
+    content = this.replaceVariables(content, vars);
+    
     const targetPath = localPath || join('downloaded', repo, filePath);
     await this.saveFile(content, targetPath);
   }
