@@ -1,6 +1,6 @@
-import { ConfigParser } from './config-parser.js';
-import { GitHubFetcher } from './github-fetcher.js';
-import { Config, RepoSource } from './types.js';
+import { ConfigParser } from './libs/config-parser.js';
+import { GitHubFetcher } from './libs/github-fetcher.js';
+import type { Config, RepoSource } from './types.js';
 
 export class RepoFileSync {
   private configParser = new ConfigParser();

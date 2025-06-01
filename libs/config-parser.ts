@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import YAML from 'yaml';
-import { Config } from './types.js';
+import { Config } from '../types.js';
 
 export class ConfigParser {
   async parseConfig(configPath: string): Promise<Config> {
