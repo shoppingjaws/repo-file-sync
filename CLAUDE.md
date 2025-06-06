@@ -4,24 +4,23 @@
 
 ## 開発コマンド
 
-- **ツールの実行**: `bun run index.ts [config-file]` (デフォルトは `repo-file-sync.yaml`)
-- **型チェック**: `bun tsc --noEmit`
-- **依存関係のインストール**: `bun install`
+- **ツールの実行**: `python main.py [config-file]` (デフォルトは `repo-file-sync.yaml`)
+- **依存関係のインストール**: `pip install -r requirements.txt`
 
 ## アーキテクチャ概要
 
-これはYAML設定に基づいてGitHubリポジトリからローカルディレクトリにファイルを同期するTypeScriptツールです。
+これはYAML設定に基づいてGitHubリポジトリからローカルディレクトリにファイルを同期するPythonツールです。
 
 ### コアコンポーネント
 
-- **`RepoFileSync`** (`repo-file-sync.ts`): 同期プロセスを調整するメインオーケストレータークラス
-- **`ConfigParser`** (`libs/config-parser.ts`): YAML設定ファイルの解析と検証を処理
-- **`GitHubFetcher`** (`libs/github-fetcher.ts`): GitHubのraw content APIからのファイルダウンロードを管理
-- **Types** (`types.ts`): `Config`と`RepoSource`インターフェースを定義
+- **`RepoFileSync`** (`repo_file_sync.py`): 同期プロセスを調整するメインオーケストレータークラス
+- **`ConfigParser`** (`libs/config_parser.py`): YAML設定ファイルの解析と検証を処理
+- **`GitHubFetcher`** (`libs/github_fetcher.py`): GitHubのraw content APIからのファイルダウンロードを管理
+- **Types** (`types.py`): `Config`と`RepoSource`のTypedDict定義
 
 ### データフロー
 
-1. `index.ts`エントリーポイントが`RepoFileSync`インスタンスを作成
+1. `main.py`エントリーポイントが`RepoFileSync`インスタンスを作成
 2. `ConfigParser`がソースリポジトリとファイルリストを含むYAML設定を読み込み・検証
 3. 各ソースに対して、`GitHubFetcher`が`https://raw.githubusercontent.com/{repo}/{ref}/{file}`からファイルをダウンロード
 4. ファイルはデフォルトで`downloaded/{repo}/{file}`に保存される
@@ -35,6 +34,5 @@ YAML設定は以下でソースを定義：
 
 ### 実行環境
 
-- ランタイムおよびパッケージマネージャーとしてBunを使用
-- TypeScriptファイルに`.js`インポートを使用するESモジュール
-- bundlerモジュール解決を使用した厳密なTypeScript設定
+- Python 3.7以降が必要
+- 依存関係: PyYAML, requests
