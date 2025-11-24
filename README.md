@@ -7,7 +7,7 @@ A GitHub Action to synchronize files from source repositories and automatically 
 - 📦 Sync files from multiple source repositories
 - 🎯 Support for glob patterns (`*.md`, `**/*.yaml`, etc.)
 - 📁 Directory synchronization
-- 🔄 Automatic PR creation with detailed change summary
+- 🔄 Automatic PR creation and updates with detailed change summary
 - ⚡ Fast execution with Bun runtime
 - 🤖 Preserves source file paths in destination
 - 🔧 **Text replacement with regex patterns** (modify content during sync)
@@ -75,7 +75,7 @@ jobs:
 |-------|-------------|----------|---------|
 | `config-path` | Path to configuration file | No | `.github/repo-file-sync.yaml` |
 | `token` | GitHub token for authentication | No | `${{ github.token }}` |
-| `branch-prefix` | Prefix for sync branch name | No | `repo-file-sync/update` |
+| `branch-name` | Fixed branch name for synchronization | No | `repo-file-sync` |
 | `commit-message` | Commit message | No | `chore: sync files from source repositories` |
 | `pr-title` | Pull Request title | No | `chore: sync files from source repositories` |
 | `pr-labels` | Comma-separated PR labels | No | `automated` |
@@ -234,8 +234,10 @@ jobs:
 1. **Read Configuration**: Loads `.github/repo-file-sync.yaml`
 2. **Clone Sources**: Clones each configured source repository
 3. **Match Files**: Expands glob patterns and matches files
-4. **Copy Files**: Copies matched files to the same paths in target repository
-5. **Create PR**: If changes detected, creates a branch and Pull Request
+4. **Apply Replacements**: Applies regex replacements if configured
+5. **Copy Files**: Copies matched files to the same paths in target repository
+6. **Update Branch**: Uses a fixed branch name (`repo-file-sync` by default) and force-pushes updates
+7. **Create or Update PR**: Creates a new PR if none exists, or updates the existing PR with new changes
 
 ## Permissions
 

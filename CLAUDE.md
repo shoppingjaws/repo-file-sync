@@ -9,7 +9,8 @@ This file provides context for AI assistants working on this project.
 ## Purpose
 
 - Synchronize common files (documentation, configuration, templates) across repositories
-- Keep files up-to-date from upstream/source repositories
+- Apply regex-based text replacements to synchronized files
+- Keep files up-to-date from upstream/source repositories via a single, updateable PR
 - Automate file synchronization via GitHub Actions workflows
 
 ## Technology Stack
@@ -46,14 +47,21 @@ repo-file-sync/
 1. **Read Configuration**: Loads `.github/repo-file-sync.yaml` from target repo
 2. **Clone Sources**: Clones each configured source repository (shallow clone)
 3. **Match Files**: Uses `Bun.Glob` to expand patterns and match files
-4. **Copy Files**: Copies matched files maintaining source path structure
-5. **Detect Changes**: Runs `git status --porcelain`
-6. **Create Branch**: Creates timestamped branch (`repo-file-sync/update-YYYY-MM-DD-HH-MM-SS`)
-7. **Commit & Push**: Commits changes and pushes to remote
-8. **Create PR**: Uses `gh pr create` via `Bun.spawn` (labels are optional)
+4. **Apply Replacements**: Applies regex text replacements if configured (using `String.replace()` with RegExp)
+5. **Copy Files**: Copies matched files maintaining source path structure
+6. **Detect Changes**: Runs `git status --porcelain`
+7. **Update Branch**: Uses fixed branch name (`repo-file-sync` by default)
+   - If branch exists remotely: checkout existing branch and reset to main
+   - If not exists: create new branch from main
+8. **Commit & Force Push**: Commits changes and force pushes to update branch (keeps PR open)
+9. **Update or Create PR**:
+   - Checks for existing PR using `gh pr list`
+   - If PR exists: updates it using `gh pr edit`
+   - If not exists: creates new PR using `gh pr create` (labels are optional)
 
 ### Configuration Format
 
+#### Basic Format (Files Only)
 ```yaml
 repos:
   owner/repo-name:
@@ -62,6 +70,27 @@ repos:
       - "*.md"              # Glob patterns
       - docs/**/*.yaml      # Nested patterns
       - .github/workflows/  # Directories
+```
+
+#### Advanced Format (With Text Replacements)
+```yaml
+repos:
+  owner/repo-name:
+    files:
+      README.md:
+        replacements:
+          - pattern: '\bcheckout\b'      # Word boundary regex
+            replacement: 'CHECKOUT'
+            flags: 'g'                    # Global flag
+          - pattern: 'v([0-9]+)'          # Capture groups
+            replacement: 'VERSION_$1'
+            flags: 'g'
+      LICENSE:                            # File without replacements
+      "*.md":                             # Glob pattern with replacements
+        replacements:
+          - pattern: 'old-text'
+            replacement: 'new-text'
+            flags: 'gi'                   # Global + case-insensitive
 ```
 
 ### Important Notes
@@ -85,9 +114,19 @@ repos:
 - Labels are added in a separate step using `gh pr edit` (failures are non-fatal)
 - This prevents PR creation failures due to missing labels
 
-#### Branch Naming
-- Format: `{branch-prefix}-YYYY-MM-DD-HH-MM-SS`
-- Includes timestamp with minutes to avoid conflicts on multiple runs
+#### Branch and PR Strategy
+- **Fixed Branch Name**: Uses `repo-file-sync` by default (configurable via `branch-name` input)
+- **No Timestamps**: Branch name is fixed to enable PR updates instead of creating new PRs
+- **Force Push**: Updates existing branch with force push to keep the same PR open
+- **PR Updates**: If PR exists, updates title/body/labels; if not, creates new PR
+- **Key Implementation**: Must checkout existing branch first before force push to keep PR open:
+  ```typescript
+  if (branchExists) {
+    await $`git checkout -B ${branchName} origin/${branchName}`.quiet();
+    await $`git reset --hard main`.quiet();
+    await commitAndPush(message, branchName, true); // force push
+  }
+  ```
 
 ### Testing
 
@@ -110,8 +149,10 @@ bun run test-local.ts
 
 ✅ **Working**: All features implemented and tested
 - File synchronization from multiple repos
-- Glob pattern matching
-- PR creation with detailed body
+- Glob pattern matching with directory support
+- Regex-based text replacements with capture groups and flags
+- Fixed branch with force push for PR updates
+- PR creation and updates with detailed body
 - Optional label handling
 - Local and CI testing
 
@@ -166,6 +207,11 @@ gh run watch
 **"Label not found" errors**
 - Status: Working as intended (labels are now optional)
 - Labels are added via separate `gh pr edit` command after PR creation
+
+**Branch deletion closes PR**
+- Problem: Deleting and recreating a branch closes the associated PR
+- Solution: Checkout existing branch first, then reset and force push
+- Must use: `git checkout -B ${branch} origin/${branch}` before force push
 
 ## Reference Links
 

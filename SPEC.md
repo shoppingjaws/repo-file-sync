@@ -15,7 +15,9 @@
 - Support multiple source repositories
 - Support file patterns with wildcards (e.g., `*.md`, `*.yaml`)
 - Support directory synchronization
-- Create a single PR containing all changes
+- Text replacement with regex patterns during synchronization
+- Fixed branch name with force push for consistent updates
+- Create or update a single PR containing all changes
 - Preserve source file paths in destination repository
 
 ## Implementation
@@ -144,16 +146,24 @@ repos:
 2. For each configured source repository:
    - Clone or fetch the source repository
    - Match files based on the specified patterns
+   - Apply regex text replacements if configured
    - Copy matched files to the same relative path in the target repository
 3. If changes are detected:
-   - Create a new branch (e.g., `repo-file-sync/update-YYYYMMDD-HHMMSS`)
+   - Check if the branch already exists remotely
+   - If exists: checkout the existing branch and reset to main
+   - If not exists: create a new branch from main
    - Commit all changes
-   - Create a Pull Request with all synchronized files
+   - Force push to update the branch (keeps existing PR open)
+4. Check for existing Pull Request for the branch:
+   - If PR exists: update the PR title, body, and labels
+   - If not exists: create a new Pull Request
 
-### Pull Request
+### Pull Request and Branch Management
 
-- **Branch naming**: `repo-file-sync/update-{timestamp}`
-- **PR title**: `chore: sync files from source repositories`
+- **Branch naming**: Fixed name `repo-file-sync` (no timestamp)
+- **Branch updates**: Force push to keep the same branch and PR open
+- **PR behavior**: Single PR is created once, then updated on subsequent runs
+- **PR title**: `chore: sync files from source repositories` (configurable)
 - **PR body**: List of synchronized files and their source repositories
 - **Single PR**: All changes from multiple repositories are included in one PR
 
@@ -170,7 +180,8 @@ repos:
 |------|-------------|----------|---------|
 | `config-path` | Path to configuration file | No | `.github/repo-file-sync.yaml` |
 | `token` | GitHub token for authentication | No | `${{ github.token }}` |
-| `branch-prefix` | Prefix for the sync branch name | No | `repo-file-sync/update` |
+| `branch-name` | Fixed branch name for synchronization | No | `repo-file-sync` |
+| `branch-prefix` | **DEPRECATED** - Use `branch-name` instead | No | (ignored) |
 | `commit-message` | Commit message template | No | `chore: sync files from source repositories` |
 | `pr-title` | Pull Request title | No | `chore: sync files from source repositories` |
 | `pr-labels` | Comma-separated PR labels | No | `automated` |
