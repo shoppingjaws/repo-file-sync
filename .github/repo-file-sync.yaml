@@ -1,6 +1,33 @@
 repos:
   actions/checkout:
     files:
-      - README.md
-      - LICENSE
-      - action.yml
+      README.md:
+        replacements:
+          # Word boundary regex - only replace standalone "checkout"
+          - pattern: '\bcheckout\b'
+            replacement: 'CHECKOUT'
+            flags: 'g'
+          # URL pattern with protocol group
+          - pattern: 'https?://github\.com/actions/checkout'
+            replacement: 'https://example.com/test-repo'
+            flags: 'gi'
+          # Version number pattern (v followed by digits)
+          - pattern: '\bv([0-9]+)\b'
+            replacement: 'VERSION_$1'
+            flags: 'g'
+          # Email-like pattern
+          - pattern: '([a-zA-Z0-9._+-]+)@([a-zA-Z0-9.-]+)'
+            replacement: '$1[at]$2'
+            flags: 'g'
+      LICENSE:
+        # No replacements for LICENSE
+      action.yml:
+        replacements:
+          # Exact string match with quotes
+          - pattern: "name: 'Checkout'"
+            replacement: "name: 'Test Action'"
+            flags: 'g'
+          # Pattern matching description field
+          - pattern: "description: '(.+?)'"
+            replacement: "description: '[MODIFIED] $1'"
+            flags: 'g'
