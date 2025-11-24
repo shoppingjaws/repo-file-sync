@@ -22,11 +22,11 @@ jobs:
         id: sync
         uses: shoppingjaws/repo-file-sync@main
         with:
-          config-path: .github/repo-file-sync.yaml
+          config-path: .github/repo-file-sync-test.yaml
           token: ${{ secrets.GITHUB_TOKEN }}
           branch-prefix: repo-file-sync/update
-          commit-message: 'chore: sync files from source repositories'
-          pr-title: 'chore: sync files from source repositories'
+          commit-message: 'chore: sync files from source repositories (with text replacements)'
+          pr-title: 'chore: sync files from source repositories (with text replacements)'
           pr-labels: 'automated,sync'
 
       - name: Output sync results
