@@ -205,10 +205,15 @@ async function commitAndPush(message: string, branchName: string, force: boolean
     ? `https://x-access-token:${TOKEN}@github.com/${REPOSITORY}.git`
     : `origin`;
 
-  if (force) {
-    await $`git push --force ${pushUrl} ${branchName}`.quiet();
-  } else {
-    await $`git push ${pushUrl} ${branchName}`.quiet();
+  try {
+    if (force) {
+      await $`git push --force ${pushUrl} ${branchName}`;
+    } else {
+      await $`git push -u ${pushUrl} ${branchName}`;
+    }
+  } catch (err) {
+    error(`Failed to push: ${err}`);
+    throw err;
   }
 }
 
