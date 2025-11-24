@@ -276,7 +276,7 @@ async function main() {
   }
 
   // Create branch and commit
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").split("T")[0];
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "-").slice(0, -5);
   const branchName = `${BRANCH_PREFIX}-${timestamp}`;
 
   log(`\n📝 Creating branch: ${branchName}`);
