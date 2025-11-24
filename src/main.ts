@@ -494,7 +494,7 @@ async function main() {
   await createBranch(branchName);
 
   log("💾 Committing changes");
-  await commitAndPush(COMMIT_MESSAGE, branchName, branchExists);
+  await commitAndPush(COMMIT_MESSAGE, branchName, false);
 
   // Create PR body
   let prBody = "## Synchronized Files\n\n";
