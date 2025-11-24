@@ -491,12 +491,16 @@ async function main() {
 
   if (branchExists) {
     log(`Found existing branch, will update with force push`);
-    // Create new branch from main (will replace local if exists)
+    // Checkout the existing remote branch
     try {
-      await $`git checkout main`.quiet();
-      await $`git branch -D ${branchName}`.quiet().nothrow();
-    } catch {}
-    await createBranch(branchName);
+      await $`git checkout -B ${branchName} origin/${branchName}`.quiet();
+    } catch {
+      // If checkout fails, create from main
+      await createBranch(branchName);
+    }
+
+    // Reset to main and apply our changes
+    await $`git reset --hard main`.quiet();
 
     log("💾 Committing changes");
     await commitAndPush(COMMIT_MESSAGE, branchName, true);
