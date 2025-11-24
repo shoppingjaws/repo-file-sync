@@ -161,16 +161,10 @@ async function commitAndPush(message: string, branchName: string) {
 // Create a Pull Request using GitHub CLI
 async function createPullRequest(branchName: string, title: string, body: string, labels: string): Promise<{ number: string, url: string } | null> {
   try {
-    const labelArgs = labels.split(",").map(l => l.trim()).filter(l => l.length > 0);
-
     // Build command arguments array
     const args = ["pr", "create", "--title", title, "--body", body, "--head", branchName];
 
-    // Add labels
-    for (const label of labelArgs) {
-      args.push("--label", label);
-    }
-
+    // Create PR without labels first
     const proc = Bun.spawn(["gh", ...args], {
       env: {
         GH_TOKEN: TOKEN,
@@ -199,6 +193,25 @@ async function createPullRequest(branchName: string, title: string, body: string
     const url = urlMatch ? urlMatch[0] : "";
     const numberMatch = url.match(/\/pull\/(\d+)/);
     const number = numberMatch ? numberMatch[1] : "";
+
+    // Try to add labels if specified (but don't fail if labels don't exist)
+    const labelArgs = labels.split(",").map(l => l.trim()).filter(l => l.length > 0);
+    if (labelArgs.length > 0 && number) {
+      try {
+        const labelProc = Bun.spawn(["gh", "pr", "edit", number, ...labelArgs.flatMap(l => ["--add-label", l])], {
+          env: {
+            GH_TOKEN: TOKEN,
+            ...process.env
+          },
+        });
+        await labelProc.exited;
+        if (labelProc.exitCode !== 0) {
+          warning(`Could not add labels to PR #${number} (labels may not exist)`);
+        }
+      } catch (err) {
+        warning(`Could not add labels: ${err}`);
+      }
+    }
 
     return { number, url };
   } catch (err) {
