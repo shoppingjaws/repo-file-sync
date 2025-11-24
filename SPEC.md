@@ -184,7 +184,6 @@ repos:
 | `branch-prefix` | **DEPRECATED** - Use `branch-name` instead | No | (ignored) |
 | `commit-message` | Commit message template | No | `chore: sync files from source repositories` |
 | `pr-title` | Pull Request title | No | `chore: sync files from source repositories` |
-| `pr-labels` | Comma-separated PR labels | No | `automated` |
 
 ## Outputs
 

@@ -57,7 +57,7 @@ repo-file-sync/
 9. **Update or Create PR**:
    - Checks for existing PR using `gh pr list`
    - If PR exists: updates it using `gh pr edit`
-   - If not exists: creates new PR using `gh pr create` (labels are optional)
+   - If not exists: creates new PR using `gh pr create`
 
 ### Configuration Format
 
@@ -109,16 +109,11 @@ repos:
     pull-requests: write
   ```
 
-#### PR Creation Strategy
-- PRs are created WITHOUT labels first (to avoid label-not-found errors)
-- Labels are added in a separate step using `gh pr edit` (failures are non-fatal)
-- This prevents PR creation failures due to missing labels
-
 #### Branch and PR Strategy
 - **Fixed Branch Name**: Uses `repo-file-sync` by default (configurable via `branch-name` input)
 - **No Timestamps**: Branch name is fixed to enable PR updates instead of creating new PRs
 - **Force Push**: Updates existing branch with force push to keep the same PR open
-- **PR Updates**: If PR exists, updates title/body/labels; if not, creates new PR
+- **PR Updates**: If PR exists, updates title/body; if not, creates new PR
 - **Key Implementation**: Must checkout existing branch first before force push to keep PR open:
   ```typescript
   if (branchExists) {
@@ -153,15 +148,13 @@ bun run test-local.ts
 - Regex-based text replacements with capture groups and flags
 - Fixed branch with force push for PR updates
 - PR creation and updates with detailed body
-- Optional label handling
 - Local and CI testing
 
 ## Known Issues / Limitations
 
-1. **Labels**: Labels must exist in the repository or they'll be skipped (warning only)
-2. **Authentication**: Currently uses `GITHUB_TOKEN` (works for same org/public repos)
-3. **File Conflicts**: Overwrites files without merge conflict detection
-4. **Large Files**: No special handling for large files or LFS
+1. **Authentication**: Currently uses `GITHUB_TOKEN` (works for same org/public repos)
+2. **File Conflicts**: Overwrites files without merge conflict detection
+3. **Large Files**: No special handling for large files or LFS
 
 ## Future Enhancements
 
@@ -203,10 +196,6 @@ gh run watch
 **"GitHub Actions is not permitted to create pull requests"**
 - Solution: Enable in Settings → Actions → General → Workflow permissions
 - Check: "Allow GitHub Actions to create and approve pull requests"
-
-**"Label not found" errors**
-- Status: Working as intended (labels are now optional)
-- Labels are added via separate `gh pr edit` command after PR creation
 
 **Branch deletion closes PR**
 - Problem: Deleting and recreating a branch closes the associated PR

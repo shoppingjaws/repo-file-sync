@@ -10,7 +10,6 @@ const TOKEN = process.env.INPUT_TOKEN || process.env.GITHUB_TOKEN || "";
 const BRANCH_NAME = process.env.INPUT_BRANCH_NAME || process.env.INPUT_BRANCH_PREFIX || "repo-file-sync";
 const COMMIT_MESSAGE = process.env.INPUT_COMMIT_MESSAGE || "chore: sync files from source repositories";
 const PR_TITLE = process.env.INPUT_PR_TITLE || "chore: sync files from source repositories";
-const PR_LABELS = process.env.INPUT_PR_LABELS || "automated";
 const WORKSPACE = process.env.GITHUB_WORKSPACE || process.cwd();
 const REPOSITORY = process.env.GITHUB_REPOSITORY || "";
 
@@ -280,11 +279,10 @@ async function findExistingPR(branchName: string): Promise<string | null> {
 }
 
 // Update existing PR
-async function updateExistingPR(prNumber: string, title: string, body: string, labels: string): Promise<boolean> {
+async function updateExistingPR(prNumber: string, title: string, body: string): Promise<boolean> {
   try {
     log(`Updating existing PR #${prNumber}`);
 
-    // Update title and body
     const proc = Bun.spawn(["gh", "pr", "edit", prNumber, "--title", title, "--body", body], {
       env: {
         GH_TOKEN: TOKEN,
@@ -302,25 +300,6 @@ async function updateExistingPR(prNumber: string, title: string, body: string, l
       return false;
     }
 
-    // Try to add labels
-    const labelArgs = labels.split(",").map(l => l.trim()).filter(l => l.length > 0);
-    if (labelArgs.length > 0) {
-      try {
-        const labelProc = Bun.spawn(["gh", "pr", "edit", prNumber, ...labelArgs.flatMap(l => ["--add-label", l])], {
-          env: {
-            GH_TOKEN: TOKEN,
-            ...process.env
-          },
-        });
-        await labelProc.exited;
-        if (labelProc.exitCode !== 0) {
-          warning(`Could not add labels to PR #${prNumber} (labels may not exist)`);
-        }
-      } catch (err) {
-        warning(`Could not add labels: ${err}`);
-      }
-    }
-
     return true;
   } catch (err) {
     error(`Failed to update PR: ${err}`);
@@ -329,12 +308,10 @@ async function updateExistingPR(prNumber: string, title: string, body: string, l
 }
 
 // Create a Pull Request using GitHub CLI
-async function createPullRequest(branchName: string, title: string, body: string, labels: string): Promise<{ number: string, url: string } | null> {
+async function createPullRequest(branchName: string, title: string, body: string): Promise<{ number: string, url: string } | null> {
   try {
-    // Build command arguments array
     const args = ["pr", "create", "--title", title, "--body", body, "--head", branchName];
 
-    // Create PR without labels first
     const proc = Bun.spawn(["gh", ...args], {
       env: {
         GH_TOKEN: TOKEN,
@@ -363,25 +340,6 @@ async function createPullRequest(branchName: string, title: string, body: string
     const url = urlMatch ? urlMatch[0] : "";
     const numberMatch = url.match(/\/pull\/(\d+)/);
     const number = numberMatch ? numberMatch[1] : "";
-
-    // Try to add labels if specified (but don't fail if labels don't exist)
-    const labelArgs = labels.split(",").map(l => l.trim()).filter(l => l.length > 0);
-    if (labelArgs.length > 0 && number) {
-      try {
-        const labelProc = Bun.spawn(["gh", "pr", "edit", number, ...labelArgs.flatMap(l => ["--add-label", l])], {
-          env: {
-            GH_TOKEN: TOKEN,
-            ...process.env
-          },
-        });
-        await labelProc.exited;
-        if (labelProc.exitCode !== 0) {
-          warning(`Could not add labels to PR #${number} (labels may not exist)`);
-        }
-      } catch (err) {
-        warning(`Could not add labels: ${err}`);
-      }
-    }
 
     return { number, url };
   } catch (err) {
@@ -531,7 +489,7 @@ async function main() {
   if (existingPrNumber) {
     // Update existing PR
     log(`Found existing PR #${existingPrNumber}, updating it`);
-    const updated = await updateExistingPR(existingPrNumber, PR_TITLE, prBody, PR_LABELS);
+    const updated = await updateExistingPR(existingPrNumber, PR_TITLE, prBody);
 
     if (updated) {
       const prUrl = `https://github.com/${REPOSITORY}/pull/${existingPrNumber}`;
@@ -545,7 +503,7 @@ async function main() {
   } else {
     // Create new PR
     log("🔀 Creating new Pull Request");
-    const pr = await createPullRequest(branchName, PR_TITLE, prBody, PR_LABELS);
+    const pr = await createPullRequest(branchName, PR_TITLE, prBody);
 
     if (pr) {
       setOutput("pr-number", pr.number);

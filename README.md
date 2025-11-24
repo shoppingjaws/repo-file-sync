@@ -78,7 +78,6 @@ jobs:
 | `branch-name` | Fixed branch name for synchronization | No | `repo-file-sync` |
 | `commit-message` | Commit message | No | `chore: sync files from source repositories` |
 | `pr-title` | Pull Request title | No | `chore: sync files from source repositories` |
-| `pr-labels` | Comma-separated PR labels | No | `automated` |
 
 ### Action Outputs
 
@@ -217,9 +216,8 @@ jobs:
         uses: shoppingjaws/repo-file-sync@main
         with:
           config-path: .github/sync-config.yaml
-          branch-prefix: automated/sync
+          branch-name: automated-sync
           pr-title: "📦 Sync files from upstream"
-          pr-labels: "automated,documentation"
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check outputs
