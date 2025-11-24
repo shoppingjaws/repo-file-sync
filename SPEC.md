@@ -61,6 +61,8 @@ This is a **composite action** that can be used in any GitHub Actions workflow.
 
 ### Format
 
+#### Basic Format (Files Only)
+
 ```yaml
 repos:
   owner/repo1:
@@ -74,14 +76,59 @@ repos:
       - "*.txt"
 ```
 
+#### Advanced Format (With Text Replacements)
+
+```yaml
+repos:
+  owner/repo1:
+    files:
+      README.md:
+        replacements:
+          - pattern: 'original-text'
+            replacement: 'new-text'
+            flags: 'g'
+          - pattern: 'https://example\.com'
+            replacement: 'https://mysite.com'
+            flags: 'gi'
+      docs/*.md:
+        replacements:
+          - pattern: '\bfoo\b'
+            replacement: 'bar'
+            flags: 'g'
+      .github/workflows/:
+        # No replacements, sync as-is
+```
+
+#### Mixed Format
+
+```yaml
+repos:
+  owner/repo:
+    files:
+      - LICENSE              # Simple file path (no replacements)
+      README.md:             # File with replacements
+        replacements:
+          - pattern: 'old'
+            replacement: 'new'
+            flags: 'g'
+      - docs/*.md            # Glob pattern (no replacements)
+```
+
 ### Configuration Schema
 
 - `repos`: Object containing source repositories
   - Key: Repository identifier in `owner/repo` format
   - Value: Object containing file configuration
-    - `files`: Array of file or directory paths to sync
-      - Supports wildcards (e.g., `*.md`, `**/*.yaml`)
-      - Supports directory paths (trailing `/` is optional)
+    - `files`: Array or Object containing file paths and optional replacement rules
+      - **Array format**: List of file/directory paths (no text replacement)
+        - Supports wildcards (e.g., `*.md`, `**/*.yaml`)
+        - Supports directory paths (trailing `/` is optional)
+      - **Object format**: File path as key, configuration as value
+        - `replacements`: Array of replacement rules (optional)
+          - `pattern`: Regular expression pattern (string)
+          - `replacement`: Replacement text (string)
+          - `flags`: Regex flags (string, e.g., `'g'`, `'gi'`, `'gm'`)
+      - **Mixed format**: Can combine both array items and object entries
 
 ## Authentication
 

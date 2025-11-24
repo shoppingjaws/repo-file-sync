@@ -10,6 +10,7 @@ A GitHub Action to synchronize files from source repositories and automatically 
 - 🔄 Automatic PR creation with detailed change summary
 - ⚡ Fast execution with Bun runtime
 - 🤖 Preserves source file paths in destination
+- 🔧 **Text replacement with regex patterns** (modify content during sync)
 
 ## Usage
 
@@ -90,6 +91,8 @@ jobs:
 
 ### Configuration File Format
 
+#### Basic Format (Files Only)
+
 ```yaml
 repos:
   # Repository in owner/repo format
@@ -108,6 +111,38 @@ repos:
       - scripts
 ```
 
+#### Advanced Format (With Text Replacements)
+
+```yaml
+repos:
+  owner/repository-name:
+    files:
+      # File with text replacements
+      README.md:
+        replacements:
+          - pattern: 'original-org'
+            replacement: 'my-org'
+            flags: 'g'
+          - pattern: 'https://example\.com'
+            replacement: 'https://mysite.com'
+            flags: 'gi'
+
+      # File without replacements
+      LICENSE:
+
+      # Glob pattern with replacements
+      "docs/*.md":
+        replacements:
+          - pattern: '\bfoo\b'
+            replacement: 'bar'
+            flags: 'g'
+```
+
+**Replacement Rule Fields:**
+- `pattern`: Regular expression pattern (string)
+- `replacement`: Replacement text (string)
+- `flags`: Regex flags (`'g'` = global, `'i'` = case-insensitive, `'m'` = multiline)
+
 ## Examples
 
 ### Basic Usage
@@ -118,6 +153,34 @@ repos:
     files:
       - .editorconfig
       - .prettierrc
+```
+
+### With Text Replacements
+
+```yaml
+repos:
+  upstream-org/template-repo:
+    files:
+      README.md:
+        replacements:
+          # Replace organization name
+          - pattern: 'upstream-org'
+            replacement: 'my-org'
+            flags: 'g'
+          # Replace URLs
+          - pattern: 'https://upstream-org\.com'
+            replacement: 'https://my-org.com'
+            flags: 'gi'
+
+      # Sync LICENSE without modifications
+      LICENSE:
+
+      # Replace placeholder values in configs
+      .github/workflows/*.yml:
+        replacements:
+          - pattern: 'SLACK_WEBHOOK_PLACEHOLDER'
+            replacement: '${{ secrets.SLACK_WEBHOOK }}'
+            flags: 'g'
 ```
 
 ### Multiple Repositories

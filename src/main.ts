@@ -14,8 +14,20 @@ const PR_LABELS = process.env.INPUT_PR_LABELS || "automated";
 const WORKSPACE = process.env.GITHUB_WORKSPACE || process.cwd();
 const REPOSITORY = process.env.GITHUB_REPOSITORY || "";
 
+interface ReplacementRule {
+  pattern: string;
+  replacement: string;
+  flags: string;
+}
+
+interface FileConfigWithReplacements {
+  replacements?: ReplacementRule[];
+}
+
+type FileEntry = string | Record<string, FileConfigWithReplacements>;
+
 interface RepoConfig {
-  files: string[];
+  files: FileEntry[] | Record<string, FileConfigWithReplacements>;
 }
 
 interface Config {
@@ -72,6 +84,27 @@ async function loadConfig(configPath: string): Promise<Config | null> {
   }
 }
 
+// Apply text replacements to file content
+async function applyReplacements(filePath: string, replacements: ReplacementRule[]): Promise<void> {
+  try {
+    let content = await Bun.file(filePath).text();
+
+    for (const rule of replacements) {
+      try {
+        const regex = new RegExp(rule.pattern, rule.flags);
+        content = content.replace(regex, rule.replacement);
+        log(`  Applied replacement: ${rule.pattern} -> ${rule.replacement} (flags: ${rule.flags})`);
+      } catch (err) {
+        warning(`  Invalid regex pattern: ${rule.pattern} - ${err}`);
+      }
+    }
+
+    await Bun.write(filePath, content);
+  } catch (err) {
+    error(`Failed to apply replacements to ${filePath}: ${err}`);
+  }
+}
+
 // Clone a repository to a temporary directory
 async function cloneRepository(repo: string, tempDir: string): Promise<boolean> {
   try {
@@ -89,41 +122,53 @@ async function cloneRepository(repo: string, tempDir: string): Promise<boolean> 
   }
 }
 
-// Expand glob patterns and copy files
-async function syncFiles(sourceDir: string, patterns: string[], destDir: string): Promise<string[]> {
+// Expand glob patterns and copy files with optional text replacements
+async function syncFiles(
+  sourceDir: string,
+  pattern: string,
+  destDir: string,
+  replacements?: ReplacementRule[]
+): Promise<string[]> {
   const syncedFiles: string[] = [];
 
-  for (const pattern of patterns) {
-    try {
-      log(`Processing pattern: ${pattern}`);
+  try {
+    log(`Processing pattern: ${pattern}`);
 
-      // Use glob to find matching files
-      const glob = new Bun.Glob(pattern);
-      const matches = await Array.fromAsync(glob.scan({ cwd: sourceDir, absolute: false, onlyFiles: false }));
+    // Use glob to find matching files
+    const glob = new Bun.Glob(pattern);
+    const matches = await Array.fromAsync(glob.scan({ cwd: sourceDir, absolute: false, onlyFiles: false }));
 
-      if (matches.length === 0) {
-        warning(`No files matched pattern: ${pattern}`);
-        continue;
-      }
-
-      for (const match of matches) {
-        const sourcePath = join(sourceDir, match);
-        const destPath = join(destDir, match);
-
-        // Create destination directory if needed
-        const destDirPath = join(destPath, "..");
-        await $`mkdir -p ${destDirPath}`.quiet();
-
-        // Copy file or directory
-        if ((await Bun.file(sourcePath).exists())) {
-          await $`cp -r ${sourcePath} ${destPath}`.quiet();
-          syncedFiles.push(match);
-          log(`Synced: ${match}`);
-        }
-      }
-    } catch (err) {
-      error(`Failed to process pattern ${pattern}: ${err}`);
+    if (matches.length === 0) {
+      warning(`No files matched pattern: ${pattern}`);
+      return syncedFiles;
     }
+
+    for (const match of matches) {
+      const sourcePath = join(sourceDir, match);
+      const destPath = join(destDir, match);
+
+      // Create destination directory if needed
+      const destDirPath = join(destPath, "..");
+      await $`mkdir -p ${destDirPath}`.quiet();
+
+      // Copy file or directory
+      if ((await Bun.file(sourcePath).exists())) {
+        await $`cp -r ${sourcePath} ${destPath}`.quiet();
+
+        // Apply text replacements if specified and it's a file
+        if (replacements && replacements.length > 0) {
+          const stat = await Bun.file(destPath).stat();
+          if (stat && !stat.isDirectory()) {
+            await applyReplacements(destPath, replacements);
+          }
+        }
+
+        syncedFiles.push(match);
+        log(`Synced: ${match}${replacements && replacements.length > 0 ? ' (with replacements)' : ''}`);
+      }
+    }
+  } catch (err) {
+    error(`Failed to process pattern ${pattern}: ${err}`);
   }
 
   return syncedFiles;
@@ -255,8 +300,32 @@ async function main() {
         continue;
       }
 
-      // Sync files
-      const syncedFiles = await syncFiles(tempDir, repoConfig.files, WORKSPACE);
+      // Parse files configuration (array or object format)
+      const filesConfig = repoConfig.files;
+      let syncedFiles: string[] = [];
+
+      if (Array.isArray(filesConfig)) {
+        // Array format: can contain strings or objects
+        for (const entry of filesConfig) {
+          if (typeof entry === "string") {
+            // Simple string pattern
+            const files = await syncFiles(tempDir, entry, WORKSPACE);
+            syncedFiles.push(...files);
+          } else if (typeof entry === "object") {
+            // Object with pattern as key
+            for (const [pattern, config] of Object.entries(entry)) {
+              const files = await syncFiles(tempDir, pattern, WORKSPACE, config?.replacements);
+              syncedFiles.push(...files);
+            }
+          }
+        }
+      } else if (typeof filesConfig === "object") {
+        // Object format: keys are patterns
+        for (const [pattern, config] of Object.entries(filesConfig)) {
+          const files = await syncFiles(tempDir, pattern, WORKSPACE, config?.replacements);
+          syncedFiles.push(...files);
+        }
+      }
 
       if (syncedFiles.length > 0) {
         allSyncedFiles[repo] = syncedFiles;

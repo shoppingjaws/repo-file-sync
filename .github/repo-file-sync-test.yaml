@@ -1,0 +1,18 @@
+repos:
+  actions/checkout:
+    files:
+      README.md:
+        replacements:
+          - pattern: 'checkout'
+            replacement: 'CHECKOUT'
+            flags: 'g'
+          - pattern: 'https://github\.com/actions/checkout'
+            replacement: 'https://example.com/test-repo'
+            flags: 'gi'
+      LICENSE:
+        # No replacements for LICENSE
+      action.yml:
+        replacements:
+          - pattern: "name: 'Checkout'"
+            replacement: "name: 'Test Action'"
+            flags: 'g'
