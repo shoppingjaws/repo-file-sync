@@ -18,9 +18,40 @@
 - Create a single PR containing all changes
 - Preserve source file paths in destination repository
 
+## Implementation
+
+### Technology Stack
+
+- **Runtime**: Bun (JavaScript/TypeScript runtime)
+- **Language**: TypeScript with Bun Shell
+- **YAML Parser**: `Bun.YAML` (native YAML support)
+- **Shell Operations**: `Bun.$` for git and file operations
+- **Action Type**: Composite Action
+
+### Project Structure
+
+```
+repo-file-sync/
+├── action.yaml          # Composite action definition
+├── src/
+│   └── main.ts          # Main TypeScript implementation
+├── package.json         # Bun dependencies and scripts
+├── tsconfig.json        # TypeScript configuration
+├── SPEC.md              # This specification
+└── README.md            # Usage documentation
+```
+
+### Why Bun?
+
+- Native YAML parsing with `Bun.YAML.parse()`
+- Fast TypeScript execution without transpilation
+- Integrated shell scripting with `Bun.$`
+- Official GitHub Actions support via `oven-sh/setup-bun`
+- Single binary, no complex build process
+
 ## Workflow Type
 
-This is a **reusable workflow** that can be called from other GitHub Actions workflows.
+This is a **composite action** that can be used in any GitHub Actions workflow.
 
 ## Configuration File
 
@@ -88,23 +119,23 @@ repos:
 
 ## Inputs
 
-TBD (to be defined during implementation)
-
-Possible inputs:
-- `config-path`: Path to configuration file (default: `.github/repo-file-sync.yaml`)
-- `branch-name`: Custom branch name for PR
-- `commit-message`: Custom commit message
-- `pr-title`: Custom PR title
-- `token`: GitHub token for authentication (default: `${{ github.token }}`)
+| Name | Description | Required | Default |
+|------|-------------|----------|---------|
+| `config-path` | Path to configuration file | No | `.github/repo-file-sync.yaml` |
+| `token` | GitHub token for authentication | No | `${{ github.token }}` |
+| `branch-prefix` | Prefix for the sync branch name | No | `repo-file-sync/update` |
+| `commit-message` | Commit message template | No | `chore: sync files from source repositories` |
+| `pr-title` | Pull Request title | No | `chore: sync files from source repositories` |
+| `pr-labels` | Comma-separated PR labels | No | `automated` |
 
 ## Outputs
 
-TBD (to be defined during implementation)
-
-Possible outputs:
-- `pr-number`: Created PR number
-- `pr-url`: Created PR URL
-- `files-changed`: Number of files changed
+| Name | Description |
+|------|-------------|
+| `pr-number` | Created Pull Request number (empty if no changes) |
+| `pr-url` | Created Pull Request URL (empty if no changes) |
+| `files-synced` | Number of files synchronized |
+| `changes-detected` | Whether changes were detected (`true` or `false`) |
 
 ## Error Handling
 

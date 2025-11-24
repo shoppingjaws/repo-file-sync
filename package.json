@@ -1,0 +1,17 @@
+{
+  "name": "repo-file-sync",
+  "version": "1.0.0",
+  "description": "GitHub Action to synchronize files from source repositories",
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

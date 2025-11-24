@@ -1,0 +1,41 @@
+name: Sync Files
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    # Allow manual trigger from GitHub UI
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync files from source repositories
+        id: sync
+        uses: shoppingjaws/repo-file-sync@main
+        with:
+          config-path: .github/repo-file-sync.yaml
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch-prefix: repo-file-sync/update
+          commit-message: 'chore: sync files from source repositories'
+          pr-title: 'chore: sync files from source repositories'
+          pr-labels: 'automated,sync'
+
+      - name: Output sync results
+        if: always()
+        run: |
+          echo "Changes detected: ${{ steps.sync.outputs.changes-detected }}"
+          echo "Files synced: ${{ steps.sync.outputs.files-synced }}"
+          if [ -n "${{ steps.sync.outputs.pr-url }}" ]; then
+            echo "Pull Request created: ${{ steps.sync.outputs.pr-url }}"
+          else
+            echo "No Pull Request created (no changes detected)"
+          fi

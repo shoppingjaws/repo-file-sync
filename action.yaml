@@ -1,0 +1,77 @@
+name: 'Repository File Sync'
+description: 'Synchronize files from source repositories and create a PR with changes'
+author: 'shoppingjaws'
+
+branding:
+  icon: 'refresh-cw'
+  color: 'blue'
+
+inputs:
+  config-path:
+    description: 'Path to the configuration file'
+    required: false
+    default: '.github/repo-file-sync.yaml'
+  token:
+    description: 'GitHub token for authentication'
+    required: false
+    default: ${{ github.token }}
+  branch-prefix:
+    description: 'Prefix for the sync branch name'
+    required: false
+    default: 'repo-file-sync/update'
+  commit-message:
+    description: 'Commit message for synchronized files'
+    required: false
+    default: 'chore: sync files from source repositories'
+  pr-title:
+    description: 'Title for the Pull Request'
+    required: false
+    default: 'chore: sync files from source repositories'
+  pr-labels:
+    description: 'Comma-separated labels for the PR'
+    required: false
+    default: 'automated'
+
+outputs:
+  pr-number:
+    description: 'Created Pull Request number (empty if no changes)'
+    value: ${{ steps.sync.outputs.pr-number }}
+  pr-url:
+    description: 'Created Pull Request URL (empty if no changes)'
+    value: ${{ steps.sync.outputs.pr-url }}
+  files-synced:
+    description: 'Number of files synchronized'
+    value: ${{ steps.sync.outputs.files-synced }}
+  changes-detected:
+    description: 'Whether changes were detected (true or false)'
+    value: ${{ steps.sync.outputs.changes-detected }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: latest
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        bun install
+
+    - name: Run file sync
+      id: sync
+      shell: bash
+      env:
+        INPUT_CONFIG_PATH: ${{ inputs.config-path }}
+        INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_BRANCH_PREFIX: ${{ inputs.branch-prefix }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_PR_TITLE: ${{ inputs.pr-title }}
+        INPUT_PR_LABELS: ${{ inputs.pr-labels }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_WORKSPACE: ${{ github.workspace }}
+      run: |
+        cd ${{ github.action_path }}
+        bun run src/main.ts

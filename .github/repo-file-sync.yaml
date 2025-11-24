@@ -1,0 +1,6 @@
+repos:
+  actions/checkout:
+    files:
+      - README.md
+      - LICENSE
+      - action.yml
