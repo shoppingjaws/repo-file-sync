@@ -485,21 +485,29 @@ async function main() {
   // Use fixed branch name (no timestamp)
   const branchName = BRANCH_NAME;
 
-  // Check if remote branch exists and delete it if so
+  // Check if remote branch exists
   log(`\n🔍 Checking for existing branch: ${branchName}`);
   const branchExists = await remotebranchExists(branchName);
 
   if (branchExists) {
-    log(`Found existing branch, deleting and recreating from main`);
-    await deleteBranch(branchName);
+    log(`Found existing branch, will update with force push`);
+    // Create new branch from main (will replace local if exists)
+    try {
+      await $`git checkout main`.quiet();
+      await $`git branch -D ${branchName}`.quiet().nothrow();
+    } catch {}
+    await createBranch(branchName);
+
+    log("💾 Committing changes");
+    await commitAndPush(COMMIT_MESSAGE, branchName, true);
+  } else {
+    log(`No existing branch, creating new one`);
+    // Create new branch from main
+    await createBranch(branchName);
+
+    log("💾 Committing changes");
+    await commitAndPush(COMMIT_MESSAGE, branchName, false);
   }
-
-  // Create new branch from main
-  log(`📝 Creating branch: ${branchName}`);
-  await createBranch(branchName);
-
-  log("💾 Committing changes");
-  await commitAndPush(COMMIT_MESSAGE, branchName, false);
 
   // Create PR body
   let prBody = "## Synchronized Files\n\n";
