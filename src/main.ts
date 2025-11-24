@@ -162,15 +162,39 @@ async function commitAndPush(message: string, branchName: string) {
 async function createPullRequest(branchName: string, title: string, body: string, labels: string): Promise<{ number: string, url: string } | null> {
   try {
     const labelArgs = labels.split(",").map(l => l.trim()).filter(l => l.length > 0);
-    const labelFlags = labelArgs.length > 0 ? labelArgs.map(l => `--label "${l}"`).join(" ") : "";
 
-    const prBody = body.replace(/"/g, '\\"');
+    // Build command arguments array
+    const args = ["pr", "create", "--title", title, "--body", body, "--head", branchName];
 
-    const result = await $`gh pr create --title "${title}" --body "${prBody}" ${labelFlags} --head ${branchName}`.env({
-      GH_TOKEN: TOKEN,
-      ...process.env
-    }).text();
+    // Add labels
+    for (const label of labelArgs) {
+      args.push("--label", label);
+    }
 
+    const proc = Bun.spawn(["gh", ...args], {
+      env: {
+        GH_TOKEN: TOKEN,
+        ...process.env
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+
+    await proc.exited;
+
+    if (proc.exitCode !== 0) {
+      error(`gh pr create failed with exit code ${proc.exitCode}`);
+      error(`stdout: ${stdout}`);
+      error(`stderr: ${stderr}`);
+      return null;
+    }
+
+    const result = stdout + stderr;
     const urlMatch = result.match(/https:\/\/github\.com\/[^\s]+/);
     const url = urlMatch ? urlMatch[0] : "";
     const numberMatch = url.match(/\/pull\/(\d+)/);
