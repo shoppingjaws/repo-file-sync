@@ -7,12 +7,17 @@ import { join } from "path";
 // GitHub Actions inputs from environment variables
 const CONFIG_PATH = process.env.INPUT_CONFIG_PATH || ".github/repo-file-sync.yaml";
 const TOKEN = process.env.INPUT_TOKEN || process.env.GITHUB_TOKEN || "";
-const BRANCH_PREFIX = process.env.INPUT_BRANCH_PREFIX || "repo-file-sync/update";
+const BRANCH_NAME = process.env.INPUT_BRANCH_NAME || process.env.INPUT_BRANCH_PREFIX || "repo-file-sync";
 const COMMIT_MESSAGE = process.env.INPUT_COMMIT_MESSAGE || "chore: sync files from source repositories";
 const PR_TITLE = process.env.INPUT_PR_TITLE || "chore: sync files from source repositories";
 const PR_LABELS = process.env.INPUT_PR_LABELS || "automated";
 const WORKSPACE = process.env.GITHUB_WORKSPACE || process.cwd();
 const REPOSITORY = process.env.GITHUB_REPOSITORY || "";
+
+// Warn if deprecated branch-prefix is used
+if (process.env.INPUT_BRANCH_PREFIX && !process.env.INPUT_BRANCH_NAME) {
+  warning("branch-prefix is deprecated. Please use branch-name instead. Using first part of branch-prefix as branch-name.");
+}
 
 interface ReplacementRule {
   pattern: string;
@@ -192,7 +197,7 @@ async function createBranch(branchName: string) {
 }
 
 // Commit and push changes
-async function commitAndPush(message: string, branchName: string) {
+async function commitAndPush(message: string, branchName: string, force: boolean = false) {
   await $`git add .`.quiet();
   await $`git commit -m ${message}`.quiet();
 
@@ -200,7 +205,122 @@ async function commitAndPush(message: string, branchName: string) {
     ? `https://x-access-token:${TOKEN}@github.com/${REPOSITORY}.git`
     : `origin`;
 
-  await $`git push ${pushUrl} ${branchName}`.quiet();
+  if (force) {
+    await $`git push --force ${pushUrl} ${branchName}`.quiet();
+  } else {
+    await $`git push ${pushUrl} ${branchName}`.quiet();
+  }
+}
+
+// Check if remote branch exists
+async function remotebranchExists(branchName: string): Promise<boolean> {
+  try {
+    await $`git fetch origin ${branchName}`.quiet();
+    const result = await $`git rev-parse --verify origin/${branchName}`.quiet().nothrow();
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+// Delete remote and local branches
+async function deleteBranch(branchName: string) {
+  try {
+    // Delete remote branch
+    const pushUrl = TOKEN
+      ? `https://x-access-token:${TOKEN}@github.com/${REPOSITORY}.git`
+      : `origin`;
+
+    await $`git push ${pushUrl} --delete ${branchName}`.quiet().nothrow();
+    log(`Deleted remote branch: ${branchName}`);
+  } catch {
+    // Ignore errors if branch doesn't exist
+  }
+
+  try {
+    // Delete local branch if exists
+    await $`git branch -D ${branchName}`.quiet().nothrow();
+  } catch {
+    // Ignore errors
+  }
+}
+
+// Find existing PR for the branch
+async function findExistingPR(branchName: string): Promise<string | null> {
+  try {
+    const proc = Bun.spawn(["gh", "pr", "list", "--head", branchName, "--json", "number", "--jq", ".[0].number"], {
+      env: {
+        GH_TOKEN: TOKEN,
+        ...process.env
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    const [stdout, stderr] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+    ]);
+
+    await proc.exited;
+
+    if (proc.exitCode === 0 && stdout.trim()) {
+      return stdout.trim();
+    }
+    return null;
+  } catch (err) {
+    warning(`Failed to find existing PR: ${err}`);
+    return null;
+  }
+}
+
+// Update existing PR
+async function updateExistingPR(prNumber: string, title: string, body: string, labels: string): Promise<boolean> {
+  try {
+    log(`Updating existing PR #${prNumber}`);
+
+    // Update title and body
+    const proc = Bun.spawn(["gh", "pr", "edit", prNumber, "--title", title, "--body", body], {
+      env: {
+        GH_TOKEN: TOKEN,
+        ...process.env
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    await proc.exited;
+
+    if (proc.exitCode !== 0) {
+      const stderr = await new Response(proc.stderr).text();
+      error(`Failed to update PR: ${stderr}`);
+      return false;
+    }
+
+    // Try to add labels
+    const labelArgs = labels.split(",").map(l => l.trim()).filter(l => l.length > 0);
+    if (labelArgs.length > 0) {
+      try {
+        const labelProc = Bun.spawn(["gh", "pr", "edit", prNumber, ...labelArgs.flatMap(l => ["--add-label", l])], {
+          env: {
+            GH_TOKEN: TOKEN,
+            ...process.env
+          },
+        });
+        await labelProc.exited;
+        if (labelProc.exitCode !== 0) {
+          warning(`Could not add labels to PR #${prNumber} (labels may not exist)`);
+        }
+      } catch (err) {
+        warning(`Could not add labels: ${err}`);
+      }
+    }
+
+    return true;
+  } catch (err) {
+    error(`Failed to update PR: ${err}`);
+    return false;
+  }
 }
 
 // Create a Pull Request using GitHub CLI
@@ -357,15 +477,24 @@ async function main() {
     return;
   }
 
-  // Create branch and commit
-  const timestamp = new Date().toISOString().replace(/[:.]/g, "-").replace("T", "-").slice(0, -5);
-  const branchName = `${BRANCH_PREFIX}-${timestamp}`;
+  // Use fixed branch name (no timestamp)
+  const branchName = BRANCH_NAME;
 
-  log(`\n📝 Creating branch: ${branchName}`);
+  // Check if remote branch exists and delete it if so
+  log(`\n🔍 Checking for existing branch: ${branchName}`);
+  const branchExists = await remotebranchExists(branchName);
+
+  if (branchExists) {
+    log(`Found existing branch, deleting and recreating from main`);
+    await deleteBranch(branchName);
+  }
+
+  // Create new branch from main
+  log(`📝 Creating branch: ${branchName}`);
   await createBranch(branchName);
 
   log("💾 Committing changes");
-  await commitAndPush(COMMIT_MESSAGE, branchName);
+  await commitAndPush(COMMIT_MESSAGE, branchName, branchExists);
 
   // Create PR body
   let prBody = "## Synchronized Files\n\n";
@@ -378,17 +507,37 @@ async function main() {
   }
   prBody += `---\n\n*Automated by [repo-file-sync](https://github.com/${REPOSITORY})*`;
 
-  // Create Pull Request
-  log("🔀 Creating Pull Request");
-  const pr = await createPullRequest(branchName, PR_TITLE, prBody, PR_LABELS);
+  // Check for existing PR
+  log("🔍 Checking for existing Pull Request");
+  const existingPrNumber = await findExistingPR(branchName);
 
-  if (pr) {
-    setOutput("pr-number", pr.number);
-    setOutput("pr-url", pr.url);
-    info(`✅ Pull Request created: ${pr.url}`);
+  if (existingPrNumber) {
+    // Update existing PR
+    log(`Found existing PR #${existingPrNumber}, updating it`);
+    const updated = await updateExistingPR(existingPrNumber, PR_TITLE, prBody, PR_LABELS);
+
+    if (updated) {
+      const prUrl = `https://github.com/${REPOSITORY}/pull/${existingPrNumber}`;
+      setOutput("pr-number", existingPrNumber);
+      setOutput("pr-url", prUrl);
+      info(`✅ Pull Request updated: ${prUrl}`);
+    } else {
+      error("Failed to update Pull Request");
+      process.exit(1);
+    }
   } else {
-    error("Failed to create Pull Request");
-    process.exit(1);
+    // Create new PR
+    log("🔀 Creating new Pull Request");
+    const pr = await createPullRequest(branchName, PR_TITLE, prBody, PR_LABELS);
+
+    if (pr) {
+      setOutput("pr-number", pr.number);
+      setOutput("pr-url", pr.url);
+      info(`✅ Pull Request created: ${pr.url}`);
+    } else {
+      error("Failed to create Pull Request");
+      process.exit(1);
+    }
   }
 }
 

@@ -15,10 +15,14 @@ inputs:
     description: 'GitHub token for authentication'
     required: false
     default: ${{ github.token }}
-  branch-prefix:
-    description: 'Prefix for the sync branch name'
+  branch-name:
+    description: 'Fixed branch name for synchronization (no timestamp)'
     required: false
-    default: 'repo-file-sync/update'
+    default: 'repo-file-sync'
+  branch-prefix:
+    description: '[DEPRECATED] Use branch-name instead'
+    required: false
+    default: ''
   commit-message:
     description: 'Commit message for synchronized files'
     required: false
@@ -66,6 +70,7 @@ runs:
       env:
         INPUT_CONFIG_PATH: ${{ inputs.config-path }}
         INPUT_TOKEN: ${{ inputs.token }}
+        INPUT_BRANCH_NAME: ${{ inputs.branch-name }}
         INPUT_BRANCH_PREFIX: ${{ inputs.branch-prefix }}
         INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
         INPUT_PR_TITLE: ${{ inputs.pr-title }}
