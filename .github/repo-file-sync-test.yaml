@@ -13,7 +13,7 @@ repos:
             flags: 'gi'
           # Version number pattern (v followed by digits)
           - pattern: '\bv([0-9]+)\b'
-            replacement: 'VERSION_$1'
+            replacement: 'VERSIONZZZ_$1'
             flags: 'g'
           # Email-like pattern
           - pattern: '([a-zA-Z0-9._+-]+)@([a-zA-Z0-9.-]+)'
