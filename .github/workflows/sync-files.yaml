@@ -24,10 +24,9 @@ jobs:
         with:
           config-path: .github/repo-file-sync-test.yaml
           token: ${{ secrets.GITHUB_TOKEN }}
-          branch-prefix: repo-file-sync/update
+          branch-name: repo-file-sync
           commit-message: 'chore: sync files from source repositories (with text replacements)'
           pr-title: 'chore: sync files from source repositories (with text replacements)'
-          pr-labels: 'automated,sync'
 
       - name: Output sync results
         if: always()
