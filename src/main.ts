@@ -140,7 +140,7 @@ async function syncFiles(
 
     // Use glob to find matching files
     const glob = new Bun.Glob(pattern);
-    const matches = await Array.fromAsync(glob.scan({ cwd: sourceDir, absolute: false, onlyFiles: false }));
+    const matches = await Array.fromAsync(glob.scan({ cwd: sourceDir, absolute: false, onlyFiles: false, dot: true }));
 
     if (matches.length === 0) {
       warning(`No files matched pattern: ${pattern}`);
