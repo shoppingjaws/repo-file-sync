@@ -449,16 +449,10 @@ async function main() {
 
   if (branchExists) {
     log(`Found existing branch, will update with force push`);
-    // Checkout the existing remote branch
-    try {
-      await $`git checkout -B ${branchName} origin/${branchName}`.quiet();
-    } catch {
-      // If checkout fails, create from main
-      await createBranch(branchName);
-    }
-
-    // Reset to main and apply our changes
-    await $`git reset --hard main`.quiet();
+    // Create local branch from current HEAD (main with already-synced files)
+    // We force push anyway, so we don't need to checkout origin's version.
+    // Using reset --hard here would wipe out the synced files in the working tree.
+    await $`git checkout -b ${branchName}`.quiet();
 
     log("💾 Committing changes");
     await commitAndPush(COMMIT_MESSAGE, branchName, true);
