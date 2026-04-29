@@ -1,134 +1,56 @@
 # repo-file-sync
 
-A GitHub Action to synchronize files from source repositories and automatically create Pull Requests with the changes.
-
-Keep your repositories in sync with upstream sources, shared configurations, or templates - all automated through GitHub Actions.
-
----
-
-**Use Cases:**
-- 📚 Sync documentation from a central docs repository
-- ⚙️ Keep configuration files consistent across projects
-- 📋 Distribute shared templates and workflows
-- 🔄 Mirror files from upstream repositories with custom modifications
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Examples](#examples)
-- [How It Works](#how-it-works)
-- [Permissions](#permissions)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
-
-## Features
-
-- 📦 Sync files from multiple source repositories
-- 🎯 Support for glob patterns (`*.md`, `**/*.yaml`, etc.)
-- 📁 Directory synchronization
-- 🔄 Automatic PR creation and updates with detailed change summary
-- ⚡ Fast execution with Bun runtime
-- 🤖 Preserves source file paths in destination
-- 🔧 **Text replacement with regex patterns** (modify content during sync)
-
-## Prerequisites
-
-Before using this action, you must configure your repository settings:
-
-### 1. Enable PR Creation by GitHub Actions
-
-Go to your repository settings and enable PR creation:
-
-**Settings** → **Actions** → **General** → **Workflow permissions**
-
-✅ Check: **"Allow GitHub Actions to create and approve pull requests"**
-
-<details>
-<summary>Why is this needed?</summary>
-
-By default, GitHub Actions workflows using `GITHUB_TOKEN` cannot create pull requests for security reasons. This action creates or updates PRs automatically, so this permission must be explicitly enabled.
-
-</details>
-
-### 2. Understand the Force-Push Behavior
-
-⚠️ **Important**: This action uses a **fixed branch name** and **force-push** strategy.
-
-**How it works:**
-- Uses a single branch (`repo-file-sync` by default) for all sync operations
-- Updates the branch with `git push --force` on each run
-- Keeps a single PR open and continuously updates it
-- **Previous commits on the sync branch will be overwritten**
-
-**Benefits:**
-- ✅ Single, always-up-to-date PR instead of multiple PRs
-- ✅ Clean commit history
-- ✅ Easy to review cumulative changes
-
-**Trade-offs:**
-- ⚠️ Cannot preserve individual sync history on the branch
-- ⚠️ Force-push overwrites any manual changes to the branch
+GitHub Actions composite action that synchronizes files from source repositories and creates a Pull Request with the changes.
 
 ## Quick Start
 
-Get started in 3 simple steps:
+### 1. Create configuration file
 
-### Step 1: Enable GitHub Actions Permissions
-
-Go to **Settings** → **Actions** → **General** → **Workflow permissions**
-
-✅ Check: **"Allow GitHub Actions to create and approve pull requests"**
-
-### Step 2: Create Configuration File
-
-Create `.github/repo-file-sync.yaml` in your repository:
+`.github/repo-file-sync.yaml`:
 
 ```yaml
 repos:
-  owner/repo1:
+  owner/source-repo:
     files:
       - README.md
-      - docs/*.md
       - .github/workflows/
-  owner/repo2:
-    files:
-      - LICENSE
-      - "*.txt"
+      - "*.json"
 ```
 
-### Step 3: Create Workflow
+### 2. Create workflow
 
-Create `.github/workflows/sync-files.yaml`:
+`.github/workflows/sync-files.yaml`:
 
 ```yaml
 name: Sync Files
 
 on:
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday
-  workflow_dispatch:      # Manual trigger
-
-permissions:
-  contents: write
-  pull-requests: write
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: your-org
+
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Sync Files
         id: sync
         uses: shoppingjaws/repo-file-sync@main
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Output results
         if: always()
@@ -137,56 +59,74 @@ jobs:
           echo "PR URL: ${{ steps.sync.outputs.pr-url }}"
 ```
 
-## Configuration
+<details>
+<summary>Using GITHUB_TOKEN instead</summary>
 
-### Action Inputs
+You can use `GITHUB_TOKEN` instead of a GitHub App Token. However, if your sync targets include workflow files (`.github/workflows/`), you need a token with the `workflows` scope — `GITHUB_TOKEN` does not have this scope, so a GitHub App Token is recommended.
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `config-path` | Path to configuration file | No | `.github/repo-file-sync.yaml` |
-| `token` | GitHub token for authentication | No | `${{ github.token }}` |
-| `branch-name` | Fixed branch name for synchronization | No | `repo-file-sync` |
-| `commit-message` | Commit message | No | `chore: sync files from source repositories` |
-| `pr-title` | Pull Request title | No | `chore: sync files from source repositories` |
+```yaml
+permissions:
+  contents: write
+  pull-requests: write
 
-### Action Outputs
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: shoppingjaws/repo-file-sync@main
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+You also need to enable PR creation in your repository settings:
+
+**Settings** → **Actions** → **General** → **Workflow permissions** → Enable **"Allow GitHub Actions to create and approve pull requests"**
+
+</details>
+
+## Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `config-path` | Path to configuration file | `.github/repo-file-sync.yaml` |
+| `token` | GitHub token for authentication | `${{ github.token }}` |
+| `branch-name` | Branch name for synchronization | `repo-file-sync` |
+| `commit-message` | Commit message | `chore: sync files from source repositories` |
+| `pr-title` | Pull Request title | `chore: sync files from source repositories` |
+
+## Outputs
 
 | Output | Description |
 |--------|-------------|
-| `pr-number` | Created Pull Request number (empty if no changes) |
-| `pr-url` | Created Pull Request URL (empty if no changes) |
+| `pr-number` | PR number (empty if no changes) |
+| `pr-url` | PR URL (empty if no changes) |
 | `files-synced` | Number of files synchronized |
-| `changes-detected` | Whether changes were detected (`true` or `false`) |
+| `changes-detected` | Whether changes were detected (`true` / `false`) |
 
-### Configuration File Format
+## Configuration
 
-#### Basic Format (Files Only)
+### Basic: File list
 
 ```yaml
 repos:
-  # Repository in owner/repo format
-  owner/repository-name:
+  owner/repo:
     files:
-      # Specific files
-      - README.md
-      - LICENSE
-
-      # Glob patterns
-      - "*.md"
-      - docs/**/*.yaml
-
-      # Directories (with or without trailing slash)
-      - .github/workflows/
-      - scripts
+      - README.md            # Single file
+      - "*.md"               # Glob pattern
+      - docs/**/*.yaml       # Nested glob
+      - .github/workflows/   # Directory
 ```
 
-#### Advanced Format (With Text Replacements)
+### Advanced: Text replacements
+
+Apply regex-based text replacements to file contents during sync.
 
 ```yaml
 repos:
-  owner/repository-name:
+  owner/repo:
     files:
-      # File with text replacements
       README.md:
         replacements:
           - pattern: 'original-org'
@@ -196,10 +136,10 @@ repos:
             replacement: 'https://mysite.com'
             flags: 'gi'
 
-      # File without replacements
+      # File without replacements (key only)
       LICENSE:
 
-      # Glob pattern with replacements
+      # Glob patterns also support replacements
       "docs/*.md":
         replacements:
           - pattern: '\bfoo\b'
@@ -207,234 +147,93 @@ repos:
             flags: 'g'
 ```
 
-**Replacement Rule Fields:**
-- `pattern`: Regular expression pattern (string)
-- `replacement`: Replacement text (string)
-- `flags`: Regex flags (`'g'` = global, `'i'` = case-insensitive, `'m'` = multiline)
+**Replacement fields:**
 
-## Examples
+| Field | Description |
+|-------|-------------|
+| `pattern` | Regular expression pattern |
+| `replacement` | Replacement text (capture groups like `$1` are supported) |
+| `flags` | Regex flags (`g`: global, `i`: case-insensitive, `m`: multiline) |
 
-### Basic Usage
+### Mixed: Array and object formats
 
-```yaml
-repos:
-  awesome-org/shared-configs:
-    files:
-      - .editorconfig
-      - .prettierrc
-```
-
-### With Text Replacements
+`files` supports both array and object formats, and they can be mixed.
 
 ```yaml
 repos:
-  upstream-org/template-repo:
+  owner/repo:
     files:
-      README.md:
+      - LICENSE                # Array item: no replacements
+      - renovate.json
+      README.md:               # Object key: with replacements
         replacements:
-          # Replace organization name
-          - pattern: 'upstream-org'
-            replacement: 'my-org'
+          - pattern: 'old'
+            replacement: 'new'
             flags: 'g'
-          # Replace URLs
-          - pattern: 'https://upstream-org\.com'
-            replacement: 'https://my-org.com'
-            flags: 'gi'
-
-      # Sync LICENSE without modifications
-      LICENSE:
-
-      # Replace placeholder values in configs
-      .github/workflows/*.yml:
-        replacements:
-          - pattern: 'SLACK_WEBHOOK_PLACEHOLDER'
-            replacement: '${{ secrets.SLACK_WEBHOOK }}'
-            flags: 'g'
-```
-
-### Multiple Repositories
-
-```yaml
-repos:
-  company/documentation:
-    files:
-      - docs/API.md
-      - docs/CONTRIBUTING.md
-
-  company/templates:
-    files:
-      - .github/ISSUE_TEMPLATE/
-      - .github/PULL_REQUEST_TEMPLATE.md
-```
-
-### With Custom Settings
-
-```yaml
-name: Sync Files
-on:
-  schedule:
-    - cron: '0 0 * * 0'
-
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Sync Files
-        id: sync
-        uses: shoppingjaws/repo-file-sync@main
-        with:
-          config-path: .github/sync-config.yaml
-          branch-name: automated-sync
-          pr-title: "📦 Sync files from upstream"
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check outputs
-        if: always()
-        run: |
-          echo "PR created: ${{ steps.sync.outputs.pr-url }}"
-          echo "Files synced: ${{ steps.sync.outputs.files-synced }}"
 ```
 
 ## How It Works
 
-1. **Read Configuration**: Loads `.github/repo-file-sync.yaml`
-2. **Clone Sources**: Clones each configured source repository
-3. **Match Files**: Expands glob patterns and matches files
-4. **Apply Replacements**: Applies regex replacements if configured
-5. **Copy Files**: Copies matched files to the same paths in target repository
-6. **Update Branch**:
-   - Uses a fixed branch name (`repo-file-sync` by default)
-   - If branch exists remotely: checks out existing branch and resets to main
-   - If not exists: creates new branch from main
-   - **Force-pushes updates** to keep the same PR open
-7. **Create or Update PR**:
-   - Checks for existing PR using the branch name
-   - If PR exists: updates title and body with new changes
-   - If not exists: creates new PR
+1. Load configuration from `.github/repo-file-sync.yaml`
+2. Shallow clone each source repository
+3. Match files using glob patterns
+4. Apply text replacement rules if configured
+5. Copy matched files to the same relative paths
+6. Commit and force push to a fixed branch
+7. Update existing PR or create a new one
 
-### Branch Strategy Details
+### Branch Strategy
 
-This action uses a **single, reusable branch** approach:
+Uses a fixed branch name with force push to maintain a single PR.
 
 ```
-┌─────────────┐
-│    main     │
-└─────────────┘
-       │
-       ├─── (run 1) ──→ create branch "repo-file-sync" ──→ create PR #1
-       │
-       ├─── (run 2) ──→ force-push to "repo-file-sync" ──→ update PR #1
-       │
-       └─── (run 3) ──→ force-push to "repo-file-sync" ──→ update PR #1
+main ─── (run 1) ──→ create "repo-file-sync" branch ──→ create PR
+     ├── (run 2) ──→ force-push to "repo-file-sync"  ──→ update PR
+     └── (run 3) ──→ force-push to "repo-file-sync"  ──→ update PR
 ```
 
-**Why force-push?**
-- Maintains a single PR for all syncs
-- Avoids creating multiple PRs for each sync
-- Keeps PR history clean and focused on the current state
-- Easier to review and merge cumulative changes
-
-## Permissions
-
-### Workflow Permissions
-
-The workflow needs the following permissions in your workflow file:
-
-```yaml
-permissions:
-  contents: write        # To create branches and commits
-  pull-requests: write   # To create Pull Requests
-```
-
-### Repository Settings
-
-⚠️ **Required**: You must also enable PR creation in your repository settings:
-
-**Settings** → **Actions** → **General** → **Workflow permissions**
-
-✅ Check: **"Allow GitHub Actions to create and approve pull requests"**
-
-Without this setting, the action will fail when trying to create or update PRs, even with the correct workflow permissions.
+Manual commits on the sync branch will be overwritten on the next run.
 
 ## Authentication
 
-By default, the action uses `${{ github.token }}` which works for:
-- Public repositories
-- Repositories within the same organization
+| Method | Use case |
+|--------|----------|
+| `GITHUB_TOKEN` | Public repos, same organization |
+| GitHub App Token | Private repos, cross-org access, syncing workflow files |
+| Personal Access Token | When neither of the above works |
 
-For cross-organization access or private repositories, you may need a Personal Access Token (PAT) with appropriate permissions.
+Syncing workflow files (`.github/workflows/`) requires a token with the `workflows` scope. `GITHUB_TOKEN` does not have this scope, so use a GitHub App Token or PAT.
+
+## Local Testing
+
+```bash
+bun run test-local.ts
+```
+
+Runs with `TEST_MODE=true`, skipping PR creation and syncing files into `test-workspace/`.
 
 ## Troubleshooting
 
-### "GitHub Actions is not permitted to create pull requests"
+### `refusing to allow a GitHub Action to create or update workflow`
 
-**Error message:**
-```
-refusing to allow a GitHub Action to create or update workflow
-```
+Syncing workflow files requires the `workflows` scope. Use a GitHub App Token or a PAT with the appropriate scope.
 
-**Solution:** Enable PR creation in repository settings:
+### `GitHub Actions is not permitted to create pull requests`
 
-**Settings** → **Actions** → **General** → **Workflow permissions**
+Enable PR creation in repository settings:
 
-✅ Check: **"Allow GitHub Actions to create and approve pull requests"**
-
-### Configuration file not found
-
-Ensure `.github/repo-file-sync.yaml` exists in your repository. You can customize the path with the `config-path` input.
-
-### Permission denied
-
-Check that your workflow has the required permissions:
-
-```yaml
-permissions:
-  contents: write
-  pull-requests: write
-```
+**Settings** → **Actions** → **General** → **Workflow permissions** → **"Allow GitHub Actions to create and approve pull requests"**
 
 ### PR gets closed unexpectedly
 
-If the PR gets closed after a sync run:
-- **Do not delete the sync branch manually** - the action reuses it
-- The action uses force-push to keep the same PR open
-- If you need to start fresh, merge or close the existing PR first, then let the action create a new one
-
-### Manual changes to sync branch are lost
-
-⚠️ This is expected behavior. The action uses **force-push** strategy:
-- All commits on the sync branch are overwritten on each run
-- Do not make manual changes to the sync branch
-- Any custom commits will be lost on the next sync
-
-**Solution:** If you need to make changes:
-1. Merge the PR
-2. Make your changes on the main branch
-3. Let the action sync again
+Do not manually delete the sync branch. The action reuses the branch to keep the PR open.
 
 ### No changes detected
 
-The action will skip PR creation if:
-- No files matched the patterns
-- All synced files are identical to existing files
-- The configuration file is empty or invalid
-
-Check the action logs for details about which files were processed.
-
-## Technology
-
-Built with:
-- [Bun](https://bun.sh) - Fast JavaScript runtime
-- TypeScript - Type-safe implementation
-- Bun Shell - Efficient shell operations
-- Native YAML parsing
+- Verify your glob patterns match the intended files
+- Files identical to the source are skipped
+- Check the action logs for details on processed files
 
 ## License
 
 MIT
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
