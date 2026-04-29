@@ -3,10 +3,8 @@ set -euo pipefail
 
 # リポジトリシークレットの設定
 # op referenceは適宜埋めてください
-gh secret set GHAPP_REPO_FILE_SYNC_APP_ID --body "$(op read 'op://Dev/github-shoppingjaws/GHAPP_REPO_FILE_SYNC_APP_ID')"
-gh secret set GHAPP_REPO_FILE_SYNC_PRIVATE_KEY --body "$(op read 'op://Dev/github-shoppingjaws/GHAPP_REPO_FILE_SYNC_PRIVATE_KEY')"
-
-gh variable set NPM_REGISTORY_NAME --body $NPM_REGISTORY_NAME
+op read 'op://Dev/github-shoppingjaws/GHAPP_REPO_FILE_SYNC_APP_ID' | gh secret set GHAPP_REPO_FILE_SYNC_APP_ID
+op read 'op://Dev/github-shoppingjaws/repo-file-sync-shoppingjaws.private-key.pem' | gh secret set GHAPP_REPO_FILE_SYNC_PRIVATE_KEY
 
 # release環境の作成（mainブランチのみアクセス可）
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
@@ -19,4 +17,7 @@ gh api --method POST "repos/${REPO}/environments/release/deployment-branch-polic
 # GitHub Actionsによるプルリクエスト作成・承認を許可
 gh api --method PUT "repos/${REPO}/actions/permissions/workflow" \
   --field "can_approve_pull_request_reviews=true" \
-  --field "default_workflow_permissions=write"
+  --field "default_workflow_permissions=read"
+
+# マージ時にブランチを自動削除
+gh api --method PATCH "repos/${REPO}" --field "delete_branch_on_merge=true"
