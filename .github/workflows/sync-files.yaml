@@ -1,40 +1,40 @@
 name: Sync Files
 
 on:
-  push:
-    branches:
-      - main
-  workflow_dispatch:
-    # Allow manual trigger from GitHub UI
-
-permissions:
-  contents: write
-  pull-requests: write
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:      # Manual trigger
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@df432ceedc7162793a195dd1713ff69aefc7379e # v2.0.6
+        with:
+          app-id: ${{ secrets.GHAPP_REPO_FILE_SYNC_APP_ID }}
+          private-key: ${{ secrets.GHAPP_REPO_FILE_SYNC_PRIVATE_KEY }}
+          owner: shoppingjaws
 
-      - name: Sync files from source repositories
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Sync Files
         id: sync
+        # uses: shoppingjaws/repo-file-sync@e5604c62bd42f3815674beefb2c9cdb8026d8bd8 # 1.0.0
         uses: shoppingjaws/repo-file-sync@main
         with:
-          config-path: .github/repo-file-sync.yaml
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch-name: repo-file-sync
-          commit-message: 'chore: sync files from source repositories (with text replacements)'
-          pr-title: 'chore: sync files from source repositories (with text replacements)'
+          token: ${{ steps.app-token.outputs.token }}
+          branch-name: develop/repo-file-sync
+          commit-message: repo-file-sync
+          pr-title: "[reop-file-sync] Syncronization"
 
-      - name: Output sync results
+
+      - name: Output results
         if: always()
         run: |
-          echo "Changes detected: ${{ steps.sync.outputs.changes-detected }}"
           echo "Files synced: ${{ steps.sync.outputs.files-synced }}"
-          if [ -n "${{ steps.sync.outputs.pr-url }}" ]; then
-            echo "Pull Request created: ${{ steps.sync.outputs.pr-url }}"
-          else
-            echo "No Pull Request created (no changes detected)"
-          fi
+          echo "PR URL: ${{ steps.sync.outputs.pr-url }}"
